@@ -1,0 +1,111 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>CareCall AI — Voice Receptionist</title>
+  <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Ccircle cx='16' cy='16' r='16' fill='%23005eb8'/%3E%3Cpath d='M13 7h6v6h6v6h-6v6h-6v-6H7v-6h6z' fill='%23fff'/%3E%3C/svg%3E">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Noto+Sans:wght@400;500;600;700&family=Noto+Sans+Devanagari:wght@400;500;600;700&display=swap">
+  <link rel="stylesheet" href="/css/app.css">
+  <script type="module" src="/js/voice.js"></script>
+</head>
+<body>
+  <a class="skip" href="#main">Skip to main content</a>
+  <header class="topbar">
+    <div class="brand">
+      <span class="logo" aria-hidden="true">✚</span>
+      <div>
+        <div class="brand-name">Mahanadi Aarogya Clinic <span lang="hi">· महानदी आरोग्य क्लिनिक</span></div>
+        <div class="brand-sub">CareCall AI receptionist · <span class="tag tag-warn">Synthetic demo · fictional clinic</span></div>
+      </div>
+    </div>
+    <nav class="topnav" aria-label="Main">
+      <a href="/" aria-current="page">Voice console</a>
+      <a href="/admin.html">Clinic admin</a>
+    </nav>
+  </header>
+
+  <main id="main" class="layout">
+    <section class="panel call" aria-labelledby="call-h">
+      <!-- Before the call -->
+      <div id="setup">
+        <h1 id="call-h">Call the clinic</h1>
+        <p class="lead">Speak in English, Hindi or Hinglish. <span lang="hi">हिंदी या English में बोलिए।</span></p>
+        <label class="field">
+          <span class="label">Calling as</span>
+          <select id="caller"><option value="">New caller</option></select>
+          <span class="hint">All callers are synthetic demo profiles. No real phone numbers are used.</span>
+        </label>
+        <label class="consent">
+          <input type="checkbox" id="consent">
+          <span>I understand my voice is sent to Gnani for transcription and is not stored.
+            <span lang="hi">मेरी आवाज़ केवल ट्रांसक्रिप्शन के लिए भेजी जाएगी, सेव नहीं होगी।</span></span>
+        </label>
+        <button id="start" class="btn btn-primary btn-xl" disabled>📞 Start call <span lang="hi">· कॉल शुरू करें</span></button>
+        <p id="setup-error" class="error" role="alert" hidden></p>
+      </div>
+
+      <!-- During the call -->
+      <div id="live" hidden>
+        <div class="call-head">
+          <div><span class="muted">On call as</span> <strong id="caller-name"></strong></div>
+          <button id="end" class="btn btn-secondary">End call</button>
+        </div>
+
+        <div id="status" class="status" role="status" aria-live="polite">Ready</div>
+
+        <div class="mic-row">
+          <button id="mic" class="btn mic" aria-describedby="mic-help">
+            <span class="mic-icon" aria-hidden="true">🎤</span>
+            <span id="mic-label">Tap to speak <span lang="hi">· बोलने के लिए दबाएँ</span></span>
+          </button>
+          <div class="meter" aria-hidden="true"><div id="level"></div></div>
+          <div id="timer" class="muted" aria-hidden="true"></div>
+          <p id="mic-help" class="hint">Tap, speak, then tap again when you finish (up to 25 seconds).</p>
+        </div>
+
+        <div class="chips" aria-label="Try saying">
+          <button class="chip" data-say="Kal subah Dr. Chandrakar ka appointment chahiye">Kal subah Dr. Chandrakar ka appointment</button>
+          <button class="chip" data-say="Clinic kitne baje khulta hai aur ultrasound ki fees kitni hai?">Timings & ultrasound fee</button>
+          <button class="chip" data-say="I want to reschedule my appointment">Reschedule my appointment</button>
+          <button class="chip" data-say="मेरे सीने में दर्द हो रहा है">सीने में दर्द (safety)</button>
+        </div>
+
+        <form id="type-form" class="type-row">
+          <label class="sr-only" for="type">Type a message</label>
+          <input id="type" autocomplete="off" placeholder="Or type here… / यहाँ लिखें…" maxlength="500">
+          <button class="btn btn-secondary" type="submit">Send</button>
+        </form>
+
+        <ol id="transcript" class="transcript" aria-live="polite" aria-label="Conversation"></ol>
+      </div>
+    </section>
+
+    <aside class="side">
+      <section class="panel" aria-labelledby="card-h">
+        <h2 id="card-h">Your request</h2>
+        <div id="card" class="card-body">
+          <p class="muted">I can help you with:</p>
+          <ul class="plain">
+            <li>Clinic timings, fees, address and test preparation</li>
+            <li>Booking, cancelling or moving an appointment</li>
+            <li>Passing a message to clinic staff</li>
+          </ul>
+          <p class="muted small">I am an administrative assistant and cannot give medical advice. In an emergency call 108 or 112.</p>
+        </div>
+      </section>
+
+      <button id="staff" class="btn btn-help" disabled>☎ Ask staff to call me <span lang="hi">· स्टाफ से कॉल करवाएँ</span></button>
+
+      <details class="panel trace" open>
+        <summary>Gnani trace <span class="muted small">(proof of each live API call)</span></summary>
+        <table>
+          <thead><tr><th scope="col">Step</th><th scope="col">Model / voice</th><th scope="col">Lang</th><th scope="col">ms</th><th scope="col">Request ID</th></tr></thead>
+          <tbody id="trace"><tr><td colspan="5" class="muted">No calls yet</td></tr></tbody>
+        </table>
+      </details>
+    </aside>
+  </main>
+</body>
+</html>
