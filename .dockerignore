@@ -1,0 +1,11 @@
+.env
+.env.*
+.git
+data
+smoke_out
+tests
+scripts
+__pycache__
+*.pyc
+.pytest_cache
+*.pdf
