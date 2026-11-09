@@ -1,0 +1,19 @@
+# Secrets
+.env
+
+# Runtime data
+data/*.db
+data/*.db-wal
+data/*.db-shm
+data/tts_cache/
+smoke_out/
+
+# Python
+__pycache__/
+*.pyc
+.venv/
+.pytest_cache/
+
+# Research PDFs are large and private to the team
+*.pdf
+
