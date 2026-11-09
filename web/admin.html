@@ -1,0 +1,94 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>CareCall AI — Clinic Admin</title>
+  <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Ccircle cx='16' cy='16' r='16' fill='%23005eb8'/%3E%3Cpath d='M13 7h6v6h6v6h-6v6h-6v-6H7v-6h6z' fill='%23fff'/%3E%3C/svg%3E">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Noto+Sans:wght@400;500;600;700&family=Noto+Sans+Devanagari:wght@400;500;600;700&display=swap">
+  <link rel="stylesheet" href="/css/app.css">
+  <script type="module" src="/js/admin.js"></script>
+</head>
+<body>
+  <a class="skip" href="#main">Skip to main content</a>
+  <header class="topbar">
+    <div class="brand">
+      <span class="logo" aria-hidden="true">✚</span>
+      <div>
+        <div class="brand-name">Mahanadi Aarogya Clinic <span lang="hi">· महानदी आरोग्य क्लिनिक</span></div>
+        <div class="brand-sub">Front desk dashboard · <span class="tag tag-warn">Synthetic demo · fictional clinic</span></div>
+      </div>
+    </div>
+    <nav class="topnav" aria-label="Main">
+      <a href="/">Voice console</a>
+      <a href="/admin.html" aria-current="page">Clinic admin</a>
+    </nav>
+  </header>
+
+  <main id="main" class="admin">
+    <div class="admin-head">
+      <h1>Today at the clinic <span id="today" class="muted small"></span></h1>
+      <div class="head-actions">
+        <span id="updated" class="muted small" aria-live="off"></span>
+        <button id="reset" class="btn btn-secondary">Reset demo data</button>
+      </div>
+    </div>
+
+    <section class="metrics" aria-label="Clinic at a glance">
+      <div class="metric"><div class="metric-label">Appointments today</div><div id="m-appts" class="metric-value">–</div><div id="m-appts-sub" class="metric-sub"></div></div>
+      <div class="metric"><div class="metric-label">Open slots today</div><div id="m-slots" class="metric-value">–</div><div class="metric-sub">across all doctors</div></div>
+      <div class="metric"><div class="metric-label">AI calls today</div><div id="m-calls" class="metric-value">–</div><div id="m-calls-sub" class="metric-sub"></div></div>
+      <div id="m-fu-tile" class="metric"><div class="metric-label">Pending follow-ups</div><div id="m-fu" class="metric-value">–</div><div id="m-fu-sub" class="metric-sub"></div></div>
+    </section>
+
+    <p id="flash" class="flash" role="status" hidden></p>
+
+    <div class="tabs" role="tablist" aria-label="Dashboard sections">
+      <button role="tab" id="tab-appts" aria-controls="panel-appts" aria-selected="true">Appointments</button>
+      <button role="tab" id="tab-fu" aria-controls="panel-fu" aria-selected="false">Follow-ups <span id="fu-badge" class="badge" hidden></span></button>
+      <button role="tab" id="tab-calls" aria-controls="panel-calls" aria-selected="false">Call log</button>
+      <button role="tab" id="tab-data" aria-controls="panel-data" aria-selected="false">Clinic data</button>
+    </div>
+
+    <section id="panel-appts" role="tabpanel" aria-labelledby="tab-appts" class="panel">
+      <div class="panel-head">
+        <h2>Upcoming appointments <span class="muted small">(next 7 days)</span></h2>
+        <label class="inline"><input type="checkbox" id="show-cancelled"> Show cancelled</label>
+      </div>
+      <div class="table-wrap"><table class="data">
+        <thead><tr><th scope="col">When</th><th scope="col">Patient</th><th scope="col">Doctor</th><th scope="col">Status</th><th scope="col">Source</th><th scope="col">Ref</th><th scope="col"><span class="sr-only">Actions</span></th></tr></thead>
+        <tbody id="appts"></tbody>
+      </table></div>
+    </section>
+
+    <section id="panel-fu" role="tabpanel" aria-labelledby="tab-fu" class="panel" hidden>
+      <div class="panel-head">
+        <h2>Callback queue</h2>
+        <label class="inline"><input type="checkbox" id="show-resolved"> Show resolved</label>
+      </div>
+      <div id="followups" class="tickets"></div>
+    </section>
+
+    <section id="panel-calls" role="tabpanel" aria-labelledby="tab-calls" class="panel" hidden>
+      <h2>Calls handled by CareCall AI</h2>
+      <div class="table-wrap"><table class="data">
+        <thead><tr><th scope="col">Started</th><th scope="col">Caller</th><th scope="col">Language</th><th scope="col">Intent</th><th scope="col">Outcome</th><th scope="col">Summary</th><th scope="col"><span class="sr-only">Transcript</span></th></tr></thead>
+        <tbody id="calls"></tbody>
+      </table></div>
+    </section>
+
+    <section id="panel-data" role="tabpanel" aria-labelledby="tab-data" class="panel" hidden>
+      <h2>Doctors</h2>
+      <p class="hint">Mark a doctor on leave and the AI receptionist stops offering that day immediately.</p>
+      <div class="table-wrap"><table class="data">
+        <thead><tr><th scope="col">Doctor</th><th scope="col">Fee</th><th scope="col">Days & hours</th><th scope="col">Leave</th></tr></thead>
+        <tbody id="doctors"></tbody>
+      </table></div>
+      <h2 class="spaced">Clinic answers (FAQs)</h2>
+      <p class="hint">The AI only answers from these. Edits apply to the next caller question.</p>
+      <div id="faqs" class="faqs"></div>
+    </section>
+  </main>
+</body>
+</html>

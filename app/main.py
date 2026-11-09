@@ -66,9 +66,11 @@ def health(conn=Depends(get_conn)) -> dict:
 from fastapi.staticfiles import StaticFiles  # noqa: E402
 
 from .config import ROOT  # noqa: E402
+from .routes_admin import router as admin_router  # noqa: E402
 from .routes_voice import router as voice_router  # noqa: E402
 
 app.include_router(voice_router)
+app.include_router(admin_router)
 
 # Static UI last, so /api routes win. html=True serves index.html at "/".
 app.mount("/", StaticFiles(directory=str(ROOT / "web"), html=True), name="web")
