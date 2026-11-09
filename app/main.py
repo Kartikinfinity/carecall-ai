@@ -67,8 +67,12 @@ from fastapi.staticfiles import StaticFiles  # noqa: E402
 
 from .config import ROOT  # noqa: E402
 from .routes_admin import router as admin_router  # noqa: E402
+from .access import AccessGate  # noqa: E402
+from .access import router as access_router  # noqa: E402
 from .routes_voice import router as voice_router  # noqa: E402
 
+app.add_middleware(AccessGate)
+app.include_router(access_router)
 app.include_router(voice_router)
 app.include_router(admin_router)
 
