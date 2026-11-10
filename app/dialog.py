@@ -22,7 +22,7 @@ from datetime import date, datetime, timedelta
 
 from google.genai import types
 
-from . import booking, safety
+from . import booking, languages, phrases, safety
 from .booking import BookingError, _iso
 from .config import now_ist
 from .db import transaction
@@ -30,7 +30,7 @@ from .llm import LLM, LLMError
 
 MAX_STEPS = 6
 PENDING_TTL_TURNS = 3
-LANGS = ("hi-IN", "en-IN", "hi-en")
+LANGS = languages.codes()
 EN_DAYS = ["Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday", "Sunday"]
 
 
@@ -49,7 +49,8 @@ class Session:
     call_id: int
     patient_id: str | None
     patient_name: str | None
-    lang: str = "hi-en"
+    lang: str = languages.DEFAULT
+    stt_auto: bool = False    # caller chose "auto-detect": Prisma listens for every language
     contents: list = field(default_factory=list)
     pending: Pending | None = None
     turn: int = 0
@@ -78,8 +79,10 @@ class SessionNotFound(KeyError):
 # ============================================================== yes / no detection
 
 def _words(text: str) -> str:
-    t = unicodedata.normalize("NFC", text.lower())
-    return " " + re.sub(r"[^\w\sऀ-ॿ]", " ", t) + " "
+    """Lower-case words separated by single spaces, punctuation and dandas removed."""
+    t = languages.strip_joiners(unicodedata.normalize("NFC", text.lower())).replace("\u0964", " ")
+    t = re.sub(rf"[^\w\s{languages.INDIC_RANGE}]", " ", t)
+    return " " + " ".join(t.split()) + " "
 
 _YES = re.compile(
     r"\s(haan|haa|han|hanji|haanji|ha|yes|yeah|yep|ok|okay|okk|confirm|confirmed|sure|done|chalega|"
@@ -89,18 +92,24 @@ _NO = re.compile(r"\s(no|nope|nahi|nahin|nhi|mat|don t|dont|wait|ruko|ruk jao|st
                  r"नहीं|नही|मत|रुको|रुकिए)\s")
 
 
-def is_yes(text: str) -> bool:
+def _says(words: str, lang: str | None, index: int) -> bool:
+    """True if `words` contains one of this language's own yes (0) or no (1) phrases."""
+    extra = phrases.YES_NO.get(lang or "", ((), ()))[index]
+    return any(_words(p) in words for p in extra)
+
+
+def is_yes(text: str, lang: str | None = None) -> bool:
     w = _words(text)
-    if _NO.search(w):
+    if _NO.search(w) or _says(w, lang, 1):
         return False
-    if _YES.search(w):
+    if _YES.search(w) or _says(w, lang, 0):
         return True
-    return len(w.split()) <= 2 and bool(re.search(r"\s(ji|jee|जी)\s", w))
+    return len(w.split()) <= 2 and bool(re.search(r"\s(ji|jee|\u091c\u0940)\s", w))
 
 
-def is_no(text: str) -> bool:
+def is_no(text: str, lang: str | None = None) -> bool:
     w = _words(text)
-    return bool(_NO.search(w)) and not _YES.search(w)
+    return (bool(_NO.search(w)) or _says(w, lang, 1)) and not (_YES.search(w) or _says(w, lang, 0))
 
 
 # ============================================================== tool declarations
@@ -156,21 +165,22 @@ class DialogEngine:
 
     # ---------------------------------------------------------------- lifecycle
 
-    def start(self, conn, patient_id: str | None = None, lang: str | None = None) -> tuple[Session, str]:
+    def start(self, conn, patient_id: str | None = None, lang: str | None = None,
+              auto: bool = False) -> tuple[Session, str]:
         name = None
         if patient_id:
             row = conn.execute("SELECT name, preferred_lang FROM patients WHERE id = ?", (patient_id,)).fetchone()
             if row is None:
                 raise booking.NotFound(f"No patient {patient_id}")
             name, lang = row["name"], lang or row["preferred_lang"]
-        lang = lang if lang in LANGS else "hi-en"
+        lang = languages.get(lang).code
         sid = uuid.uuid4().hex
         with transaction(conn):
             call_id = conn.execute(
                 "INSERT INTO calls (session_id, patient_id, started_at, language, intent, outcome)"
                 " VALUES (?, ?, ?, ?, 'GENERAL', 'IN_PROGRESS')",
                 (sid, patient_id, _iso(self.now()), lang)).lastrowid
-        sess = Session(sid, call_id, patient_id, name, lang)
+        sess = Session(sid, call_id, patient_id, name, lang, stt_auto=auto)
         self.sessions[sid] = sess
         greeting = safety.reply("GREETING", lang)
         sess.last_bot_text = greeting
@@ -199,6 +209,10 @@ class DialogEngine:
         text = (text or "").strip()
         if text:
             sess.lang = safety.guess_lang(text, fallback=sess.lang)
+            # Prisma can tell Marathi from Hindi by ear; the script alone cannot.
+            if ((stt or {}).get("language") == "mr-IN" and languages.is_supported("mr-IN")
+                    and languages.has_devanagari(text) and (sess.stt_auto or sess.lang == "mr-IN")):
+                sess.lang = "mr-IN"
         self._log(conn, sess, "user", text or "(no speech detected)", sess.lang, stt=stt)
 
         if not text:
@@ -217,8 +231,8 @@ class DialogEngine:
             return self._escalate_fixed(conn, sess, kind, reason, prio, text, stt,
                                         emergency=verdict.kind == "EMERGENCY")
 
-        affirmative = confirm_click or is_yes(text)
-        if sess.pending and (is_no(text) or sess.turn - sess.pending.turn > PENDING_TTL_TURNS):
+        affirmative = confirm_click or is_yes(text, sess.lang)
+        if sess.pending and (is_no(text, sess.lang) or sess.turn - sess.pending.turn > PENDING_TTL_TURNS):
             sess.pending = None
 
         if self.llm is None:
@@ -600,6 +614,7 @@ RULES
    - en-IN for English;
    - hi-IN for pure Hindi, written in Devanagari;
    - hi-en for Hinglish, written in MIXED script: Hindi words in Devanagari, English words in Latin letters, e.g. "जी हाँ, Doctor Chandrakar कल 10:30 बजे available हैं।"
+{_regional_rule()}
    Transcripts of Hinglish speech arrive in Devanagari with some English words in Latin; treat those as hi-en.
 9. Write times as HH:MM in 24-hour form, dates as "12 November", money as ₹400, booking references as CC-1042. Do not spell numbers out (a later step converts them for speech).
 10. Use the caller's name at most once per call. Be warm, brief and clear; older callers may be on the line.
@@ -615,13 +630,18 @@ class _TurnCtx:
 
 
 def _done_message(card: dict, lang: str) -> str:
-    ref = card.get("new_ref") or card.get("ref") or ""
-    action = card.get("action")
-    if lang == "en-IN":
-        verb = {"book": "is booked", "cancel": "is cancelled", "reschedule": "is moved"}.get(action, "is done")
-        return f"Your appointment {verb}." + (f" Reference {ref}." if ref and action != "cancel" else "")
-    verb = {"book": "बुक हो गया है", "cancel": "रद्द हो गया है", "reschedule": "बदल दिया गया है"}.get(action, "हो गया है")
-    return f"आपका appointment {verb}।" + (f" Reference {ref}." if ref and action != "cancel" else "")
+    return phrases.done(card, lang)
+
+
+def _regional_rule() -> str:
+    """Prompt lines for the languages beyond Hindi, Hinglish and English."""
+    others = [l for l in languages.enabled() if l.code not in languages.CORE]
+    if not others:
+        return ""
+    listed = ", ".join(f"{l.code} for {l.name}" for l in others)
+    return (f"   - {listed}: write each in its own script, in simple everyday words. "
+            "Always write doctor names in Latin letters exactly as in CLINIC FACTS (never transliterate, shorten or change a name), and keep numbers as the digits 0-9 (09:30, 400, CC-1042), never as words or in another numeral system.\n"
+            "   CLINIC FACTS are in English: translate them faithfully and never change a number, time, fee or name.")
 
 
 _ARABIC_SCRIPT = re.compile(r"[؀-ۿݐ-ݿ]+")

@@ -216,6 +216,8 @@ def upcoming_for_patient(conn: sqlite3.Connection, patient_id: str,
 
 
 def create_patient(conn: sqlite3.Connection, name: str, preferred_lang: str = "hi-en") -> str:
+    from . import languages
+    preferred_lang = languages.get(preferred_lang).code
     with transaction(conn):
         n = conn.execute("SELECT COUNT(*) FROM patients").fetchone()[0] + 1
         while True:

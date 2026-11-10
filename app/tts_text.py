@@ -6,6 +6,7 @@ every reply before Timbre so a stray "₹400" or "10:30" is never misread.
 
 lang: "en-IN" -> English words; "hi-IN" and "hi-en" -> Hindi (Devanagari)
 number words, which is what the chosen Poorvi/Nalini voices read best.
+The other languages get a lighter pass (see _light) and Timbre says the numbers.
 Booking references are read digit by digit.
 """
 from __future__ import annotations
@@ -170,7 +171,40 @@ def _month_index(name: str) -> int:
     raise ValueError(name)
 
 
+_EMERGENCY_NUMBER = re.compile(r"(?<!\d)(108|112)(?!\d)")
+
+
+def _light(text: str) -> str:
+    """For languages whose number words are not written by hand here.
+
+    Timbre reads digits, rupees and dates in the voice's own language, so this
+    only fixes what it cannot know: a 24-hour time becomes "1:30 PM", and the
+    booking reference and the 108/112 numbers are read digit by digit.
+    """
+    text = REF.sub(lambda m: "C C " + " ".join(m.group(1)), text)
+    text = _EMERGENCY_NUMBER.sub(lambda m: " ".join(m.group(1)), text)
+    text = ISO_DATE.sub(lambda m: f"{int(m.group(3))} {EN_MONTHS[int(m.group(2)) - 1]}", text)
+
+    def clock(m):
+        if m.group(1) is not None:
+            h, mi, suffix = int(m.group(1)), int(m.group(2)), m.group(3)
+        else:
+            h, mi, suffix = int(m.group(4)), 0, m.group(5)
+        if h > 23 or mi > 59:
+            return m.group(0)
+        if suffix:
+            ampm = suffix.replace(".", "").replace(" ", "").upper()
+            h = h + 12 if ampm == "PM" and h < 12 else 0 if ampm == "AM" and h == 12 else h
+        elif h < 12:
+            h = _infer_24h(h, m.string[:m.start()])
+        return f"{_hour_12(h)}:{mi:02d} {'AM' if h < 12 else 'PM'}"
+    text = TIME.sub(clock, text)
+    return SPACES.sub(" ", text).strip()
+
+
 def normalize(text: str, lang: str = "hi-en") -> str:
+    if lang not in ("en-IN", "hi-IN", "hi-en"):
+        return _light(text)
     en = lang == "en-IN"
     num = en_number if en else hi_number
 

@@ -67,7 +67,7 @@ CREATE TABLE IF NOT EXISTS faqs (
 CREATE TABLE IF NOT EXISTS patients (
     id             TEXT PRIMARY KEY,               -- PAT-1001
     name           TEXT NOT NULL,
-    preferred_lang TEXT NOT NULL CHECK (preferred_lang IN ('hi-IN', 'en-IN', 'hi-en')),
+    preferred_lang TEXT NOT NULL,                   -- a code from app/languages.py
     demo_contact   TEXT NOT NULL UNIQUE CHECK (demo_contact LIKE 'DEMO-IN-%')
 );
 

@@ -27,6 +27,7 @@ from pathlib import Path
 
 import httpx
 
+from . import languages
 from .config import ROOT, Settings, now_ist, settings as default_settings
 
 RETRY_STATUSES = {429, 500, 503, 504}
@@ -37,10 +38,11 @@ MIN_STT_SECONDS = 0.1
 STT_TOPIC = ("Patient calling a small Indian clinic to book, cancel or reschedule a doctor "
              "appointment, or to ask about clinic timings, fees and tests.")
 
-# Voice per reply language. Poorvi (Hinglish) was picked by ear after comparing samples.
+# Voice per reply language, from the language table. Timbre v3.0 voices speak every
+# language, so one voice with language "auto" is enough there.
 VOICES = {
-    "timbre-v2.5": {"hi-en": ("Poorvi", "hi-en"), "hi-IN": ("Nalini", "hi-IN"), "en-IN": ("Kaveri", "en-IN")},
-    "timbre-v3.0": {"hi-en": ("Shivani", "auto"), "hi-IN": ("Shivani", "auto"), "en-IN": ("Shivani", "auto")},
+    "timbre-v2.5": {l.code: (l.voice, l.tts_code) for l in languages.enabled()},
+    "timbre-v3.0": {l.code: ("Shivani", "auto") for l in languages.enabled()},
 }
 
 
@@ -212,7 +214,8 @@ class GnaniClient:
     # ------------------------------------------------------------------- STT
 
     async def transcribe(self, wav: bytes, keyterms: list[str] | None = None,
-                         previous_text: str | None = None) -> SttResult:
+                         previous_text: str | None = None, language_code: str | None = None) -> SttResult:
+        """`language_code`: Prisma codes for this call (see languages.stt_codes); default from settings."""
         seconds = wav_seconds(wav)
         request_id = f"cc-{uuid.uuid4().hex[:16]}"
         if seconds > MAX_STT_SECONDS:
@@ -222,7 +225,7 @@ class GnaniClient:
         if self.mock:
             return SttResult(self.mock_transcript, "hi-IN", f"mock-{request_id}", 5, audio_seconds=seconds)
 
-        fields = {"model": self.cfg.gnani_stt_model, "language_code": self.cfg.gnani_stt_langs,
+        fields = {"model": self.cfg.gnani_stt_model, "language_code": language_code or self.cfg.gnani_stt_langs,
                   "format": "transcribe", "topic": STT_TOPIC}
         terms = sanitize_keyterms(keyterms or [])
         if terms and self.cfg.gnani_stt_model == "prisma-v3.0":
@@ -247,7 +250,7 @@ class GnaniClient:
 
     def voice_for(self, lang: str) -> tuple[str, str]:
         voices = VOICES.get(self.cfg.gnani_tts_model, VOICES["timbre-v2.5"])
-        return voices.get(lang, voices["hi-en"])
+        return voices.get(lang, voices[languages.DEFAULT])
 
     def _cache_path(self, model: str, voice: str, lang: str, text: str) -> Path:
         key = hashlib.sha256(f"{model}|{voice}|{lang}|{text}".encode("utf-8")).hexdigest()

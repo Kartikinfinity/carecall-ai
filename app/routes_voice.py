@@ -12,7 +12,7 @@ import base64
 from fastapi import APIRouter, Depends, File, Form, HTTPException, Request, UploadFile
 from pydantic import BaseModel, Field
 
-from . import booking
+from . import booking, languages, phrases
 from .dialog import DialogEngine, SessionNotFound
 from .gnani import GnaniClient, GnaniError, keyterms_from_db
 from .tts_text import normalize
@@ -35,7 +35,7 @@ def get_conn(request: Request):
 
 class StartIn(BaseModel):
     patient_id: str | None = None
-    lang: str | None = None
+    lang: str | None = None          # a language code, or "auto" to let Prisma detect it
     speak: bool = True
 
 
@@ -61,6 +61,15 @@ async def _speak(conn, eng: DialogEngine, client: GnaniClient, sess, text: str, 
                     "latency_ms": tts.latency_ms, "cached": tts.cached, "request_id": tts.request_id}}
 
 
+@router.get("/languages")
+def list_languages() -> dict:
+    """Everything the browser needs to offer a language: names, voice and button phrases."""
+    return {"default": languages.DEFAULT, "auto": languages.AUTO,
+            "languages": [{"code": l.code, "name": l.name, "native": l.native, "html_lang": l.html_lang,
+                           "voice": l.voice, "phrases": phrases.buttons(l.code)}
+                          for l in languages.enabled()]}
+
+
 @router.get("/patients")
 def patients(conn=Depends(get_conn)) -> list[dict]:
     return [dict(r) for r in conn.execute("SELECT id, name, preferred_lang, demo_contact FROM patients ORDER BY id")]
@@ -69,11 +78,12 @@ def patients(conn=Depends(get_conn)) -> list[dict]:
 @router.post("/session")
 async def start(body: StartIn, conn=Depends(get_conn), eng=Depends(engine), client=Depends(gnani)) -> dict:
     try:
-        sess, greeting = eng.start(conn, body.patient_id, body.lang)
+        auto = body.lang == languages.AUTO
+        sess, greeting = eng.start(conn, body.patient_id, None if auto else body.lang, auto=auto)
     except booking.NotFound as exc:
         raise HTTPException(404, str(exc))
     out = {"session_id": sess.id, "patient_id": sess.patient_id, "patient_name": sess.patient_name,
-           "reply": greeting, "lang": sess.lang}
+           "reply": greeting, "lang": sess.lang, "auto": sess.stt_auto}
     if body.speak:
         out |= await _speak(conn, eng, client, sess, greeting, sess.lang)
     return out
@@ -90,7 +100,9 @@ async def transcribe(session_id: str = Form(...), audio: UploadFile = File(...),
     if len(wav) > MAX_UPLOAD_BYTES:
         raise HTTPException(413, "Recording is too long; please keep it under 25 seconds.")
     try:
-        res = await client.transcribe(wav, keyterms=keyterms_from_db(conn), previous_text=sess.last_bot_text)
+        codes = languages.stt_codes(sess.lang, sess.stt_auto, client.cfg.gnani_stt_langs)
+        res = await client.transcribe(wav, keyterms=keyterms_from_db(conn), previous_text=sess.last_bot_text,
+                                      language_code=codes)
     except GnaniError as exc:
         status = 422 if exc.kind == "audio" else 503
         raise HTTPException(status, exc.user_message)
@@ -103,7 +115,7 @@ async def transcribe(session_id: str = Form(...), audio: UploadFile = File(...),
 async def turn(body: TurnIn, conn=Depends(get_conn), eng=Depends(engine), client=Depends(gnani)) -> dict:
     waits_before = getattr(eng.llm, "rate_limit_waits", 0)
     try:
-        stt = {k: body.stt.get(k) for k in ("request_id", "latency_ms")} if body.stt else None
+        stt = {k: body.stt.get(k) for k in ("request_id", "latency_ms", "language")} if body.stt else None
         result = await eng.turn(conn, body.session_id, body.text, confirm_click=body.confirm, stt=stt)
         sess = eng.get(body.session_id)
     except SessionNotFound:
