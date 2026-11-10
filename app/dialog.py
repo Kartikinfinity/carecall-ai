@@ -640,7 +640,7 @@ def _regional_rule() -> str:
         return ""
     listed = ", ".join(f"{l.code} for {l.name}" for l in others)
     return (f"   - {listed}: write each in its own script, in simple everyday words. "
-            "Always write doctor names in Latin letters exactly as in CLINIC FACTS (never transliterate, shorten or change a name), and keep numbers as the digits 0-9 (09:30, 400, CC-1042), never as words or in another numeral system.\n"
+            "In these languages only (Hindi, Hinglish and English keep their usual style) write doctor names in Latin letters exactly as in CLINIC FACTS (never transliterate, shorten or change a name), and keep numbers as the digits 0-9 (09:30, 400, CC-1042), never as words or in another numeral system.\n"
             "   CLINIC FACTS are in English: translate them faithfully and never change a number, time, fee or name.")
 
 

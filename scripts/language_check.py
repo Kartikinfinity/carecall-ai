@@ -100,7 +100,8 @@ async def booking(llm, code: str, pace: float) -> tuple[bool, str]:
     booked = conn.execute("SELECT COUNT(*) FROM appointments WHERE patient_id = ? AND source = 'AI'"
                           " AND status = 'CONFIRMED'", (PATIENT,)).fetchone()[0]
     conn.close()
-    wrong_lang = [r.lang for r in replies if r.lang != code]
+    hindi_family = {"hi-en", "hi-IN"}          # a Hindi reply with "CC-1016" in it counts as Hinglish
+    wrong_lang = [r.lang for r in replies if r.lang != code and not {r.lang, code} <= hindi_family]
     errors = [r.source for r in replies if r.source in ("error", "busy")]
     problems = ([] if slots else ["no slots offered on the first turn"]) + \
                ([] if booked else ["no booking in the database"]) + \
