@@ -488,6 +488,12 @@ class DialogEngine:
         sess.pending = None
         sess.intent = {"EMERGENCY": "MEDICAL", "MEDICAL": "MEDICAL", "HUMAN": "HUMAN"}.get(kind, "OTHER")
         self._followup(conn, sess, reason, priority, trigger)
+        summary = {"EMERGENCY": "Emergency words detected; caller told to call 108/112; urgent callback created.",
+                   "MEDICAL": "Asked for medical advice; declined and passed to staff (urgent).",
+                   "HUMAN": "Caller asked for a person; callback created.",
+                   "NOT_UNDERSTOOD": "Could not understand the caller twice; callback created."}.get(kind)
+        if summary:
+            conn.execute("UPDATE calls SET summary = ? WHERE id = ?", (summary, sess.call_id))
         card = {"type": "escalated", "priority": priority, "emergency": emergency}
         return self._fixed_reply(conn, sess, safety.reply(kind, sess.lang), "safety", card, True)
 

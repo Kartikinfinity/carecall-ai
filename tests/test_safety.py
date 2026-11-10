@@ -7,6 +7,8 @@ from app.safety import check, guess_lang, scrub
 @pytest.mark.parametrize("text", [
     "I have chest pain", "Mere seene mein dard ho raha hai", "सीने में दर्द है", "papa ko saans nahi aa rahi",
     "मेरी माँ बेहोश हो गई", "heavy bleeding after a fall", "I think it's a heart attack", "khoon nahi ruk raha",
+    # Words in between, as people really say it (this one once slipped through to the LLM).
+    "Mere papa ke seene mein bahut dard ho raha hai", "सीने में बहुत तेज़ दर्द है", "chhati mein thoda sa dard hai",
 ])
 def test_emergency(text):
     assert check(text).kind == "EMERGENCY"

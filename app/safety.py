@@ -13,8 +13,10 @@ import unicodedata
 from dataclasses import dataclass
 
 EMERGENCY = [
-    r"chest pain", r"pain in (my )?chest", r"seene? (me|mein|mai)n? (dard|pain)", r"सीने में (दर्द|भारीपन)",
-    r"छाती में दर्द", r"chhati (me|mein) dard", r"heart attack", r"हार्ट अटैक", r"dil ka daura",
+    # Up to three words may sit in between ("seene mein bahut tez dard"), as people actually speak.
+    r"chest pain", r"pain in (my )?chest", r"(seena|seene|sine|sina) (me|mein|mai|men)n?(\s+\S+){0,3}\s+(dard|pain|bhaari|bharipan)",
+    r"सीने में(\s+\S+){0,3}\s+(दर्द|भारीपन)", r"छाती में(\s+\S+){0,3}\s+दर्द",
+    r"(chhati|chaati|chati) (me|mein)(\s+\S+){0,3}\s+dard", r"heart attack", r"हार्ट अटैक", r"dil ka daura",
     r"can'?t breathe", r"cannot breathe", r"breathing (problem|difficulty|trouble)", r"short(ness)? of breath",
     r"saa?ns? (nahi|nahin|nhi|lene) ", r"saa?ns? (phool|fool)", r"सांस (नहीं|लेने में|फूल)", r"साँस (नहीं|लेने में|फूल)",
     r"unconscious", r"fainted", r"behosh", r"बेहोश", r"heavy bleeding", r"bleeding (a lot|heavily|nahi ruk)",
