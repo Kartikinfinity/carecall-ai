@@ -157,7 +157,7 @@ dl.summary dt { color: var(--muted); } dl.summary dd { margin: 0; font-weight: 6
 .panel-head { display: flex; flex-wrap: wrap; justify-content: space-between; align-items: center; gap: .5rem; }
 .inline { display: inline-flex; gap: .5rem; align-items: center; font-weight: 500; }
 .inline input { width: 1.2rem; height: 1.2rem; min-height: 0; }
-.table-wrap { overflow-x: auto; }
+.table-wrap { overflow-x: auto; position: relative; }  /* contains sr-only labels so they cannot widen the page */
 table.data { width: 100%; border-collapse: collapse; font-size: .95rem; }
 table.data th { text-align: left; color: var(--muted); font-size: .85rem; border-bottom: 2px solid var(--border); padding: .5rem; }
 table.data td { border-bottom: 1px solid var(--border); padding: .6rem .5rem; vertical-align: top; }
