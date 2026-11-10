@@ -1,4 +1,4 @@
-"""Scripted conversations against the real Gemini model.
+"""Scripted conversations against a real LLM (Gemini by default, or Groq).
 
     python scripts/eval_dialog.py            # all scenarios
     python scripts/eval_dialog.py S3 S7      # selected ones
@@ -26,9 +26,9 @@ if hasattr(sys.stdout, "reconfigure"):
     sys.stdout.reconfigure(encoding="utf-8")
 
 from app import booking, db, seed                      # noqa: E402
-from app.config import now_ist                         # noqa: E402
+from app.config import now_ist, settings               # noqa: E402
 from app.dialog import DialogEngine                    # noqa: E402
-from app.llm import GeminiLLM                          # noqa: E402
+from app.llm import GeminiLLM, OpenAICompatLLM         # noqa: E402
 
 NOW = now_ist()
 
@@ -227,8 +227,14 @@ async def main() -> int:
     ap.add_argument("--pace", type=float, default=0.0)
     ap.add_argument("--model", default=None)
     ap.add_argument("--fallback", default=None)
+    ap.add_argument("--provider", choices=["gemini", "groq"], default="gemini")
     args = ap.parse_args()
-    llm = GeminiLLM(model=args.model, fallback_model=args.fallback)
+    if args.provider == "groq":
+        llm = OpenAICompatLLM(settings.groq_api_key, args.model or settings.groq_model,
+                              settings.groq_base_url, name="groq")
+        llm.thinking = "-"
+    else:
+        llm = GeminiLLM(model=args.model, fallback_model=args.fallback)
     chosen = [s for s in SCENARIOS if not args.ids or s.id in args.ids]
     print(f"Model {llm.model} (thinking={llm.thinking}); now {NOW:%a %Y-%m-%d %H:%M}; {len(chosen)} scenarios\n")
     passed = 0

@@ -13,6 +13,10 @@ services:
         sync: false
       - key: ACCESS_CODE
         sync: false
+      - key: GROQ_API_KEY
+        sync: false
+      - key: GROQ_MODEL
+        value: openai/gpt-oss-120b
       - key: GNANI_STT_MODEL
         value: prisma-v3.0
       - key: GNANI_STT_LANGS

@@ -93,6 +93,11 @@ REPLIES = {
         "hi-IN": "मुझे समझने में परेशानी हो रही है। मैंने रिसेप्शन स्टाफ को आपको कॉल करने के लिए कह दिया है।",
         "hi-en": "मुझे समझने में थोड़ी problem हो रही है। मैंने reception staff को आपको call back करने के लिए बोल दिया है।",
     },
+    "BUSY": {
+        "en-IN": "Sorry, I am a little busy right now. Could you please say that again in a few seconds?",
+        "hi-IN": "माफ़ कीजिए, अभी थोड़ी व्यस्तता है। कृपया कुछ सेकंड बाद दोबारा बोलिए।",
+        "hi-en": "Sorry, अभी थोड़ा busy हूँ। Please कुछ seconds बाद फिर से बोलिए।",
+    },
     "SYSTEM_ERROR": {
         "en-IN": "Sorry, I am facing a technical problem. I have asked our staff to call you back.",
         "hi-IN": "माफ़ कीजिए, अभी तकनीकी समस्या है। मैंने स्टाफ को आपको कॉल करने के लिए कह दिया है।",

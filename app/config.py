@@ -38,6 +38,9 @@ class Settings:
     gnani_mock: bool = os.getenv("GNANI_MOCK", "0") == "1"
     gemini_api_key: str = os.getenv("GEMINI_API_KEY", "").strip()
     gemini_model: str = os.getenv("GEMINI_MODEL", "gemini-3.5-flash-lite")
+    groq_api_key: str = os.getenv("GROQ_API_KEY", "").strip()
+    groq_model: str = os.getenv("GROQ_MODEL", "openai/gpt-oss-120b")
+    groq_base_url: str = os.getenv("GROQ_BASE_URL", "https://api.groq.com/openai/v1")
     access_code: str = os.getenv("ACCESS_CODE", "").strip()
     daily_gnani_cap: int = _int("DAILY_GNANI_CAP", 300)
 

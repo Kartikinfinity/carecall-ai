@@ -235,6 +235,12 @@ class DialogEngine:
         except LLMError as exc:
             del sess.contents[mark:]
             sess.contents.append(types.Content(role="user", parts=[types.Part.from_text(text=text)]))
+            if ctx.card and ctx.card.get("type") == "confirmed":
+                # The database change already happened; tell the caller that, not "busy".
+                return self._fixed_reply(conn, sess, _done_message(ctx.card, sess.lang), "fallback", ctx.card)
+            if exc.rate_limited:
+                # Free-tier rate limit: ask the caller to repeat; no need to bother staff.
+                return self._fixed_reply(conn, sess, safety.reply("BUSY", sess.lang), "busy")
             return self._system_error(conn, sess, str(exc))
         llm_ms = round((time.perf_counter() - t0) * 1000)
 
@@ -600,6 +606,16 @@ class _TurnCtx:
     card: dict | None = None
     escalated: bool = False
     tools: list[str] = field(default_factory=list)
+
+
+def _done_message(card: dict, lang: str) -> str:
+    ref = card.get("new_ref") or card.get("ref") or ""
+    action = card.get("action")
+    if lang == "en-IN":
+        verb = {"book": "is booked", "cancel": "is cancelled", "reschedule": "is moved"}.get(action, "is done")
+        return f"Your appointment {verb}." + (f" Reference {ref}." if ref and action != "cancel" else "")
+    verb = {"book": "बुक हो गया है", "cancel": "रद्द हो गया है", "reschedule": "बदल दिया गया है"}.get(action, "हो गया है")
+    return f"आपका appointment {verb}।" + (f" Reference {ref}." if ref and action != "cancel" else "")
 
 
 _ARABIC_SCRIPT = re.compile(r"[؀-ۿݐ-ݿ]+")
