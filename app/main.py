@@ -53,6 +53,16 @@ async def lifespan(app: FastAPI):
 app = FastAPI(title="CareCall AI", lifespan=lifespan)
 
 
+@app.middleware("http")
+async def revalidate_pages(request, call_next):
+    """Ask browsers to check for a newer page or script on each load (a cheap 304),
+    so a fresh deploy is never hidden behind a stale cached file."""
+    response = await call_next(request)
+    if not request.url.path.startswith("/api/"):
+        response.headers.setdefault("Cache-Control", "no-cache")
+    return response
+
+
 def get_conn() -> Iterator:
     """One SQLite connection per request (connections are not shared across threads)."""
     conn = db.connect(settings.database_path)

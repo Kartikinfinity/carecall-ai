@@ -6,19 +6,13 @@ const MAX_SECONDS = 25;
 
 const state = { session: null, lang: "hi-en", busy: false, audio: null, card: null };
 
-// Phrases the UI sends on the caller's behalf, in the call's language.
-const PHRASES = {
-  confirm: { "en-IN": "Yes, please confirm.", "hi-IN": "हाँ, कन्फर्म कर दीजिए।", "hi-en": "Haan, confirm kar dijiye." },
-  decline: { "en-IN": "No, don't do it.", "hi-IN": "नहीं, रहने दीजिए।", "hi-en": "Nahi, rehne dijiye." },
-  staff: { "en-IN": "I want to talk to the clinic staff.", "hi-IN": "मुझे स्टाफ से बात करनी है।",
-           "hi-en": "Mujhe staff se baat karni hai." },
-  slot: {
-    "en-IN": (s) => `The ${s.time} slot on ${s.weekday}, ${prettyDate(s.date)} please.`,
-    "hi-IN": (s) => `${prettyDate(s.date)} को ${s.time} वाला स्लॉट दीजिए।`,
-    "hi-en": (s) => `${prettyDate(s.date)} ko ${s.time} wala slot de dijiye.`,
-  },
-};
-const LANG_LABEL = { "hi-IN": "हिंदी", "en-IN": "English", "hi-en": "Hinglish" };
+// Language names and the phrases the buttons send come from the server (/api/languages),
+// so the browser keeps no language table of its own.
+const langs = { byCode: {}, fallback: "hi-en" };
+const langInfo = (code) => langs.byCode[code] || langs.byCode[langs.fallback] || { native: code, html_lang: "hi", phrases: {} };
+const phrase = (key, vars = {}) =>
+  (langInfo(state.lang).phrases[key] || "").replace(/\{(\w+)\}/g, (_, name) => vars[name] ?? "");
+const langLabel = (code) => langs.byCode[code]?.native || code;
 
 const recorder = new WavRecorder({
   maxSeconds: MAX_SECONDS,
@@ -98,11 +92,12 @@ function b64ToUrl(b64) {
 function addBubble(role, text, { lang, note, audioUrl, escalated } = {}) {
   const meta = el("div", { class: "meta" },
     el("span", {}, role === "user" ? "You" : "CareCall AI"),
-    lang ? el("span", { class: "tag tag-info" }, LANG_LABEL[lang] || lang) : null,
+    lang ? el("span", { class: "tag tag-info" }, langLabel(lang)) : null,
     note ? el("span", {}, note) : null,
     audioUrl ? el("button", { class: "replay", type: "button", "aria-label": "Replay this reply",
       onclick: () => play(audioUrl) }, "🔊 Replay") : null);
-  const body = el("div", hasDevanagari(text) ? { lang: "hi" } : {}, text);
+  const htmlLang = langs.byCode[lang]?.html_lang || (hasDevanagari(text) ? "hi" : null);
+  const body = el("div", htmlLang ? { lang: htmlLang } : {}, text);
   const item = el("li", { class: `bubble ${role}${escalated ? " escalated" : ""}` }, meta, body);
   $("transcript").append(item);
   item.scrollIntoView({ block: "nearest", behavior: "smooth" });
@@ -130,7 +125,7 @@ function renderCard(card) {
     }
     box.append(el("p", { class: "muted small" }, "Tap a time, or say it:"));
     box.append(el("div", { class: "slots" }, card.slots.map((s) =>
-      el("button", { class: "slot", type: "button", onclick: () => sendText(PHRASES.slot[state.lang](s)) },
+      el("button", { class: "slot", type: "button", onclick: () => sendText(phrase("slot", { date: prettyDate(s.date), time: s.time, weekday: s.weekday })) },
         el("strong", {}, s.time), `${s.weekday}, ${prettyDate(s.date)}`))));
   } else if (card.type === "pending") {
     const title = { book: "Please confirm this booking", cancel: "Please confirm the cancellation",
@@ -146,9 +141,9 @@ function renderCard(card) {
       el("p", { class: "small" }, "Say “Yes / हाँ”, or use the buttons."),
       el("div", { class: "actions" },
         el("button", { class: "btn btn-primary", type: "button",
-          onclick: () => sendText(PHRASES.confirm[state.lang], { confirm: true }) }, "✓ Confirm"),
+          onclick: () => sendText(phrase("confirm"), { confirm: true }) }, "✓ Confirm"),
         el("button", { class: "btn btn-secondary", type: "button",
-          onclick: () => sendText(PHRASES.decline[state.lang]) }, "No"))));
+          onclick: () => sendText(phrase("decline")) }, "No"))));
   } else if (card.type === "confirmed") {
     const heading = { book: "Appointment confirmed", cancel: "Appointment cancelled",
                       reschedule: "Appointment moved" }[card.action];
@@ -176,7 +171,7 @@ async function startCall() {
   $("setup-error").hidden = true;
   try {
     const patientId = $("caller").value || null;
-    const res = await postJSON("/api/session", { patient_id: patientId, speak: true });
+    const res = await postJSON("/api/session", { patient_id: patientId, lang: $("lang").value, speak: true });
     state.session = res.session_id;
     state.lang = res.lang;
     $("caller-name").textContent = res.patient_name ? `${res.patient_name} (synthetic)` : "New caller";
@@ -299,10 +294,23 @@ async function sendTurn(text, { stt = null, confirm = false } = {}) {
 
 async function init() {
   try {
-    const patients = await api("/api/patients");
+    const [patients, languages] = await Promise.all([api("/api/patients"), api("/api/languages")]);
     const group = el("optgroup", { label: "Synthetic patients" },
       patients.map((p) => el("option", { value: p.id }, `${p.name} · ${p.demo_contact}`)));
     $("caller").append(group);
+
+    langs.fallback = languages.default;
+    for (const l of languages.languages) langs.byCode[l.code] = l;
+    $("lang").replaceChildren(
+      el("option", { value: languages.auto }, "Auto-detect · any language below"),
+      ...languages.languages.map((l) => el("option", { value: l.code },
+        l.native === l.name ? l.name : `${l.native} · ${l.name}`)));
+    $("lang").value = languages.default;
+    // A known caller starts in the language the clinic has on file for them.
+    const preferred = Object.fromEntries(patients.map((p) => [p.id, p.preferred_lang]));
+    $("caller").addEventListener("change", (e) => {
+      $("lang").value = langs.byCode[preferred[e.target.value]] ? preferred[e.target.value] : languages.default;
+    });
   } catch {
     $("setup-error").textContent = "Could not reach the CareCall server.";
     $("setup-error").hidden = false;
@@ -311,7 +319,7 @@ async function init() {
   $("start").addEventListener("click", startCall);
   $("end").addEventListener("click", endCall);
   $("mic").addEventListener("click", toggleMic);
-  $("staff").addEventListener("click", () => sendText(PHRASES.staff[state.lang]));
+  $("staff").addEventListener("click", () => sendText(phrase("staff")));
   $("type-form").addEventListener("submit", (e) => {
     e.preventDefault();
     const text = $("type").value;

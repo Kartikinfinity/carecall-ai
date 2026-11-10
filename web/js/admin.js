@@ -2,6 +2,10 @@
 const $ = (id) => document.getElementById(id);
 const POLL_MS = 3000;
 const LANG = { "hi-IN": "Hindi", "en-IN": "English", "hi-en": "Hinglish" };
+// The full list lives on the server; these three are only a fallback until it loads.
+fetch("/api/languages").then((r) => (r.ok ? r.json() : null))
+  .then((data) => { for (const l of data?.languages || []) LANG[l.code] = l.name; })
+  .catch(() => {});
 const OUTCOME_TAG = { BOOKED: "ok", CANCELLED: "info", RESCHEDULED: "info", ESCALATED: "bad", ANSWERED: "info",
   IN_PROGRESS: "warn" };
 const REASON = { MEDICAL: "Medical / symptom", HUMAN_REQUEST: "Asked for staff", NOT_UNDERSTOOD: "Could not understand",

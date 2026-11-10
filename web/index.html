@@ -8,7 +8,7 @@
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Noto+Sans:wght@400;500;600;700&family=Noto+Sans+Devanagari:wght@400;500;600;700&display=swap">
   <link rel="stylesheet" href="/css/app.css">
-  <script type="module" src="/js/voice.js"></script>
+  <script type="module" src="/js/voice.js?v=2"></script>
 </head>
 <body>
   <a class="skip" href="#main">Skip to main content</a>
@@ -31,11 +31,16 @@
       <!-- Before the call -->
       <div id="setup">
         <h1 id="call-h">Call the clinic</h1>
-        <p class="lead">Speak in English, Hindi or Hinglish. <span lang="hi">हिंदी या English में बोलिए।</span></p>
+        <p class="lead">Speak in Hindi, English, Hinglish or eight more Indian languages.</p>
         <label class="field">
           <span class="label">Calling as</span>
           <select id="caller"><option value="">New caller</option></select>
           <span class="hint">All callers are synthetic demo profiles. No real phone numbers are used.</span>
+        </label>
+        <label class="field">
+          <span class="label">Language</span>
+          <select id="lang"><option value="hi-en">Hinglish</option></select>
+          <span class="hint">Pick one, or choose Auto-detect and just start speaking. Gnani Prisma listens and Timbre replies in that language.</span>
         </label>
         <label class="consent">
           <input type="checkbox" id="consent" aria-describedby="consent-text">
