@@ -38,8 +38,8 @@
           <span class="hint">All callers are synthetic demo profiles. No real phone numbers are used.</span>
         </label>
         <label class="consent">
-          <input type="checkbox" id="consent">
-          <span>I understand my voice is sent to Gnani for transcription and is not stored.
+          <input type="checkbox" id="consent" aria-describedby="consent-text">
+          <span id="consent-text">I understand my voice is sent to Gnani for transcription and is not stored.
             <span lang="hi">मेरी आवाज़ केवल ट्रांसक्रिप्शन के लिए भेजी जाएगी, सेव नहीं होगी।</span></span>
         </label>
         <button id="start" class="btn btn-primary btn-xl" disabled>📞 Start call <span lang="hi">· कॉल शुरू करें</span></button>
@@ -62,7 +62,7 @@
           </button>
           <div class="meter" aria-hidden="true"><div id="level"></div></div>
           <div id="timer" class="muted" aria-hidden="true"></div>
-          <p id="mic-help" class="hint">Tap, speak, then tap again when you finish (up to 25 seconds).</p>
+          <p id="mic-help" class="hint">Tap and speak. It stops listening when you pause, or tap again to finish (max 25 s).</p>
         </div>
 
         <div class="chips" aria-label="Try saying">

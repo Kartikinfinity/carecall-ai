@@ -229,7 +229,7 @@ async function toggleMic() {
     return;
   }
   $("mic").classList.add("recording");
-  $("mic-label").innerHTML = 'Tap when done <span lang="hi">· बोलना पूरा होने पर दबाएँ</span>';
+  $("mic-label").innerHTML = 'Listening… tap to finish <span lang="hi">· सुन रही हूँ</span>';
   setStatus("Listening…", "listening");
   timerHandle = setInterval(() => {
     const s = Math.floor(recorder.elapsed());

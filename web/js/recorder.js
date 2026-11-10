@@ -9,12 +9,39 @@ const TARGET_RATE = 16000;
 
 export class MicUnavailableError extends Error {}
 
+// End-of-speech detection: once the caller has spoken, this much quiet ends the turn.
+const SILENCE_TO_STOP_S = 1.2;
+const MIN_SPEECH_S = 0.25;
+const NOISE_CALIBRATION_S = 0.3;
+
 export class WavRecorder {
   constructor({ maxSeconds = 25, onLevel = () => {}, onAutoStop = () => {} } = {}) {
     this.maxSeconds = maxSeconds;
     this.onLevel = onLevel;
-    this.onAutoStop = onAutoStop;
+    this.onAutoStop = onAutoStop;     // called with "silence" or "max-length"
     this.recording = false;
+  }
+
+  // Simple energy VAD: learn the room's noise floor for 0.3 s, then call it speech when the
+  // level is clearly above it. After enough speech, a run of quiet stops the recording.
+  _trackSpeech(rms, seconds) {
+    const v = this.vad;
+    v.time += seconds;
+    if (v.time < NOISE_CALIBRATION_S) {
+      v.floor = Math.max(v.floor, rms);
+      return;
+    }
+    const threshold = Math.max(0.012, v.floor * 2.5);
+    if (rms > threshold) {
+      v.speech += seconds;
+      v.quiet = 0;
+    } else if (v.speech >= MIN_SPEECH_S) {
+      v.quiet += seconds;
+      if (v.quiet >= SILENCE_TO_STOP_S && !v.fired) {
+        v.fired = true;
+        this.onAutoStop("silence");
+      }
+    }
   }
 
   async start() {
@@ -40,9 +67,12 @@ export class WavRecorder {
     this.source = this.ctx.createMediaStreamSource(this.stream);
     this.node = new AudioWorkletNode(this.ctx, "pcm-capture");
     this.chunks = [];
+    this.vad = { time: 0, floor: 0, speech: 0, quiet: 0, fired: false };
+    const rate = this.ctx.sampleRate;
     this.node.port.onmessage = (e) => {
       this.chunks.push(e.data.samples);
       this.onLevel(e.data.rms);
+      this._trackSpeech(e.data.rms, e.data.samples.length / rate);
     };
     // A silent sink keeps the graph running in every browser without echoing the mic.
     this.sink = this.ctx.createGain();
@@ -50,7 +80,7 @@ export class WavRecorder {
     this.source.connect(this.node).connect(this.sink).connect(this.ctx.destination);
     this.startedAt = performance.now();
     this.recording = true;
-    this.timer = setTimeout(() => this.onAutoStop(), this.maxSeconds * 1000);
+    this.timer = setTimeout(() => this.onAutoStop("max-length"), this.maxSeconds * 1000);
   }
 
   elapsed() {
