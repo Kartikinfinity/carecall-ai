@@ -1,6 +1,6 @@
 # CareCall AI
 
-A voice receptionist for small clinics that people can talk to the way they actually talk: English, Hindi, or the usual mix of both.
+A voice receptionist for small clinics that people can talk to the way they actually talk: Hindi, English, the usual mix of both, or any of eight more Indian languages.
 
 ![Tests](https://github.com/Kartikinfinity/carecall-ai/actions/workflows/tests.yml/badge.svg)
 
@@ -56,14 +56,40 @@ Staff can also cancel appointments (with a reason), mark a doctor on leave so th
 |---|---|
 | ![Follow-ups](docs/screenshots/admin-followups.png) | ![Mobile](docs/screenshots/mobile-voice.png) |
 
+## Languages
+
+It speaks every language that Gnani's Prisma and Timbre support. You pick one before the call, or choose Auto-detect and just start talking.
+
+| Language | Prisma code | Timbre voice |
+|---|---|---|
+| Hinglish | `hi-IN,en-IN` | Poorvi |
+| Hindi | `hi-IN` | Nalini |
+| English | `en-IN` | Kaveri |
+| Marathi | `mr-IN` | Zahira |
+| Bengali | `bn-IN` | Kirra |
+| Gujarati | `gu-IN` | Falak |
+| Punjabi | `pa-IN` | Mehuli |
+| Tamil | `ta-IN` | Trisha |
+| Telugu | `te-IN` | Lavanya |
+| Kannada | `kn-IN` | Saanvi |
+| Malayalam | `ml-IN` | Reshma |
+
+How it works:
+- All of this lives in one table, `app/languages.py`. Voices, the prompt, the picker in the browser and the tests all read from it, so adding a language is one row plus its phrases.
+- Prisma gets the call's language plus English (for example `ta-IN,en-IN`), because people say "appointment" and "cancel" in every language. Auto-detect sends `indic-auto`.
+- If you switch language in the middle of a call, the reply switches too. The script of what you said decides it. Hindi and Marathi share a script, so there I look at everyday words like "आहे" and "है".
+- The emergency rule, the "no medical advice" rule and the yes/no check before a booking exist in every language, in code.
+
+**The honest part:** Hindi, English and Hinglish are the ones I tested by ear and tuned. I don't speak the other eight. For those I checked two things with `scripts/language_check.py`: Timbre speaks a sentence and Prisma has to transcribe the same sentence back (all eight came back 99–100% the same), and a full booking has to go through the real LLM in that language (all eight did). The fixed sentences in those languages still need a native speaker to read them.
+
 ## How Gnani fits in
 
 **Prisma v3.0** (`POST /stt/v3`) transcribes every turn:
-- I send `language_code=hi-IN,en-IN`, so one model handles Hindi, English and the mix.
+- I send the call's language plus English, e.g. `language_code=hi-IN,en-IN`, so one model handles Hindi, English and the mix.
 - `format=transcribe` turns spoken numbers into digits. "Saadhe das baje" comes back as `10:30`, which makes booking much more reliable.
 - The doctors' surnames go in as `keyterms`. I first tried full names, but that made Prisma insert words nobody said, so it's surnames only now.
 
-**Timbre v2.5** (`POST /api/v1/tts/inference`) speaks every reply. I listened to a few voices and went with **Poorvi** for Hinglish; she handles the mixed script really well. Pure Hindi replies use Nalini and English ones use Kaveri.
+**Timbre v2.5** (`POST /api/v1/tts/inference`) speaks every reply. I listened to a few voices and went with **Poorvi** for Hinglish; she handles the mixed script really well. Pure Hindi replies use Nalini and English ones use Kaveri; the other languages each have their own voice (table above).
 
 Between the two, Gemini 3.5 Flash-Lite runs the conversation using function calling. Gnani's own LLM, Evon, isn't on their API platform yet, so I couldn't use it. If you add a Groq key, it falls back to Groq's free tier whenever Gemini rate-limits. Otherwise the caller just gets a polite "please say that again".
 
@@ -100,8 +126,9 @@ Set `GNANI_MOCK=1` in `.env` if you want to work on the UI without spending cred
 ## Tests
 
 ```bash
-python -m pytest -q                       # 222 tests, Gnani is mocked, no credits used
+python -m pytest -q                       # 418 tests, Gnani is mocked, no credits used
 python scripts/eval_dialog.py --pace 8    # 14 real conversations against the LLM
+python scripts/language_check.py          # every language against real Prisma, Timbre and the LLM
 ```
 
 The scenario script is the one I trust most. It plays out real conversations against the actual LLM and checks what ended up in the database:
@@ -119,6 +146,8 @@ app/
   main.py          FastAPI app
   gnani.py         Prisma / Timbre client (lock, retries, cache, WAV fix)
   dialog.py        conversation engine, tools, confirmation gate
+  languages.py     the one table of supported languages and voices
+  phrases.py       fixed replies and button phrases in every language
   safety.py        emergency / medical / "talk to a person" rules
   booking.py       slots and booking, cancel, reschedule
   tts_text.py      numbers and times into spoken Hindi / English
@@ -133,7 +162,7 @@ scripts/           eval + API check scripts
 
 - **A real phone line.** Right now it's browser only. I looked at Exotel and Twilio, but getting an Indian number that streams audio needs KYC and a few days. The code is split so the same pipeline can sit behind a phone call.
 - **Speed.** Each turn takes 3–5 seconds because speech-to-text, the LLM and text-to-speech run one after another. Gnani's streaming endpoints should cut a big chunk of that.
-- **More languages.** Prisma and Timbre already support 10 Indian languages. Adding Tamil or Marathi is mostly prompt work and number-reading rules.
+- **Native-speaker review.** Eight of the eleven languages were checked by machine round trip, not by a person who speaks them. The safety sentences especially need that review before anyone relies on them.
 - **Free-tier limits.** When the LLM's free tier is busy, a turn can be slow or ask you to repeat.
 
 ## License
