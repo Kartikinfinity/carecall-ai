@@ -60,6 +60,8 @@ Staff can also cancel appointments (with a reason), mark a doctor on leave so th
 
 It speaks every language that Gnani's Prisma and Timbre support. You pick one before the call, or choose Auto-detect and just start talking.
 
+![The language picker on the start screen](docs/screenshots/voice-languages.png)
+
 | Language | Prisma code | Timbre voice |
 |---|---|---|
 | Hinglish | `hi-IN,en-IN` | Poorvi |
@@ -83,6 +85,8 @@ How it works:
 **The honest part:** Hindi, English and Hinglish are the ones I tested by ear and tuned. I don't speak the other eight. For those I checked two things with `scripts/language_check.py`: Timbre speaks a sentence and Prisma has to transcribe the same sentence back (all eight came back 99–100% the same), and a full booking has to go through the real LLM in that language (all eight did). The fixed sentences in those languages still need a native speaker to read them.
 
 ## How Gnani fits in
+
+![What happens in one caller turn](docs/architecture.png)
 
 **Prisma v3.0** (`POST /stt/v3`) transcribes every turn:
 - I send the call's language plus English, e.g. `language_code=hi-IN,en-IN`, so one model handles Hindi, English and the mix.
