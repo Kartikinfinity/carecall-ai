@@ -16,7 +16,9 @@ services:
       - key: GROQ_API_KEY
         sync: false
       - key: GROQ_MODEL
-        value: openai/gpt-oss-120b
+        value: openai/gpt-oss-120b,openai/gpt-oss-20b,qwen/qwen3.8-27b
+      - key: LLM_ORDER
+        value: groq,gemini
       - key: GNANI_STT_MODEL
         value: prisma-v3.0
       - key: GNANI_STT_LANGS

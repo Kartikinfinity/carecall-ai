@@ -110,3 +110,35 @@ def test_failure_after_confirmation_still_reports_the_booking(conn):
     run(eng.turn(conn, sess.id, "Chandrakar tomorrow 10:30"))
     r = run(eng.turn(conn, sess.id, "haan"))
     assert r.card["type"] == "confirmed" and r.card["ref"] in r.reply
+
+
+class _Backend:
+    def __init__(self, name, fail=False):
+        self.name, self.fail, self.calls, self.last_model = name, fail, 0, name
+
+    async def step(self, system, contents, tools):
+        self.calls += 1
+        if self.fail:
+            raise LLMError(f"{self.name} busy", rate_limited=True)
+        return self.name
+
+
+def test_a_rate_limited_backend_is_rested_then_tried_again():
+    now = [0.0]
+    busy, spare = _Backend("fast", fail=True), _Backend("spare")
+    chain = FallbackLLM(busy, spare, clock=lambda: now[0])
+    assert asyncio.run(chain.step("s", [], [])) == "spare" and busy.calls == 1
+    assert asyncio.run(chain.step("s", [], [])) == "spare" and busy.calls == 1          # still resting: not asked
+    now[0] = FallbackLLM.COOLDOWN_S + 1
+    busy.fail = False
+    assert asyncio.run(chain.step("s", [], [])) == "fast" and chain.last_model == "fast"
+
+
+def test_when_every_backend_is_resting_they_are_all_tried_anyway():
+    a, b = _Backend("a", fail=True), _Backend("b", fail=True)
+    chain = FallbackLLM(a, b, clock=lambda: 0.0)
+    for _ in range(2):
+        with pytest.raises(LLMError) as err:
+            asyncio.run(chain.step("s", [], []))
+        assert err.value.rate_limited
+    assert (a.calls, b.calls) == (2, 2)

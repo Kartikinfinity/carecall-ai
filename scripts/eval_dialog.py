@@ -227,10 +227,14 @@ async def main() -> int:
     ap.add_argument("--pace", type=float, default=0.0)
     ap.add_argument("--model", default=None)
     ap.add_argument("--fallback", default=None)
-    ap.add_argument("--provider", choices=["gemini", "groq"], default="gemini")
+    ap.add_argument("--provider", choices=["gemini", "groq", "app"], default="gemini")
     args = ap.parse_args()
-    if args.provider == "groq":
-        llm = OpenAICompatLLM(settings.groq_api_key, args.model or settings.groq_model,
+    if args.provider == "app":          # exactly what the running app uses, fallbacks included
+        from app.main import make_llm
+        llm = make_llm()
+        llm.model, llm.thinking = "app chain: " + " > ".join(getattr(b, "model", "?") for b in llm.backends), "-"
+    elif args.provider == "groq":
+        llm = OpenAICompatLLM(settings.groq_api_key, args.model or settings.groq_model.split(",")[0],
                               settings.groq_base_url, name="groq")
         llm.thinking = "-"
     else:

@@ -24,16 +24,19 @@ def ensure_database() -> None:
 
 
 def make_llm():
-    """Gemini first; Groq's free tier as an automatic backup when its key is set."""
+    """The LLMs to use, fastest first (LLM_ORDER); each falls through to the next when it is rate-limited."""
     from .llm import FallbackLLM, GeminiLLM, LLMError, OpenAICompatLLM
-    backends = []
+    available = {}
     try:
-        backends.append(GeminiLLM())
+        available["gemini"] = [GeminiLLM()]
     except LLMError:
         pass
     if settings.groq_api_key:
-        backends.append(OpenAICompatLLM(settings.groq_api_key, settings.groq_model,
-                                        settings.groq_base_url, name="groq"))
+        available["groq"] = [OpenAICompatLLM(settings.groq_api_key, model.strip(), settings.groq_base_url, name="groq")
+                             for model in settings.groq_model.split(",") if model.strip()]
+    order = [name.strip() for name in settings.llm_order.split(",") if name.strip() in available]
+    order += [name for name in available if name not in order]
+    backends = [backend for name in order for backend in available[name]]
     if not backends:
         return None          # turns then answer with a polite "staff will call you" fallback
     return backends[0] if len(backends) == 1 else FallbackLLM(*backends)

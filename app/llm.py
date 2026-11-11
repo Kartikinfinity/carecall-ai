@@ -205,9 +205,13 @@ class OpenAICompatLLM:
 class FallbackLLM:
     """Try each backend in order, so a Gemini rate limit falls through to a free backup."""
 
-    def __init__(self, *backends):
+    COOLDOWN_S = 20.0          # leave a rate-limited backend alone for this long
+
+    def __init__(self, *backends, clock=time.monotonic):
         self.backends = [b for b in backends if b is not None]
         self.last_model: str | None = None
+        self._clock = clock
+        self._resting: dict[int, float] = {}          # backend index -> time it may be tried again
 
     @property
     def rate_limit_waits(self) -> int:
@@ -215,12 +219,18 @@ class FallbackLLM:
 
     async def step(self, system, contents, tools):
         errors, rate_limited = [], False
-        for backend in self.backends:
+        now = self._clock()
+        rested = [i for i in range(len(self.backends)) if self._resting.get(i, 0.0) <= now]
+        # Skip backends that just said "too many requests", unless every one of them has.
+        for i in rested or range(len(self.backends)):
+            backend = self.backends[i]
             try:
                 content = await backend.step(system, contents, tools)
             except LLMError as exc:
                 errors.append(str(exc)[:200])
                 rate_limited = rate_limited or exc.rate_limited
+                if exc.rate_limited:
+                    self._resting[i] = self._clock() + self.COOLDOWN_S
                 continue
             self.last_model = getattr(backend, "last_model", None)
             return content
