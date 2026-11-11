@@ -5,3 +5,4 @@ python-dotenv
 python-multipart==0.0.20
 google-genai==2.10.0
 pytest==9.1.1
+websockets>=13

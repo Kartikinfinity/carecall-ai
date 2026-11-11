@@ -256,8 +256,12 @@ class GnaniClient:
         key = hashlib.sha256(f"{model}|{voice}|{lang}|{text}".encode("utf-8")).hexdigest()
         return self.cache_dir / f"{key}.wav"
 
-    async def synthesize(self, text: str, lang: str = "hi-en") -> TtsResult:
-        """`text` must already be normalized to spoken words (see tts_text.normalize)."""
+    async def synthesize(self, text: str, lang: str = "hi-en", audio_format: str = "wav") -> TtsResult:
+        """`text` must already be normalized to spoken words (see tts_text.normalize).
+
+        audio_format "wav" is a 24 kHz WAV for the browser; "mulaw" is raw 8 kHz mu-law for a phone line.
+        """
+        phone = audio_format == "mulaw"
         text = text.strip()
         if not text:
             raise GnaniError("bad_request", "Nothing to speak")
@@ -265,23 +269,32 @@ class GnaniClient:
         voice, api_lang = self.voice_for(lang)
         request_id = f"cc-{uuid.uuid4().hex[:16]}"
         if self.mock:
-            return TtsResult(tone_wav(), voice, model, api_lang, 5, False, f"mock-{request_id}")
+            audio = b"\xff" * 1600 if phone else tone_wav()          # 0.2 s of silence on a phone line
+            return TtsResult(audio, voice, model, api_lang, 5, False, f"mock-{request_id}")
 
         path = self._cache_path(model, voice, api_lang, text)
+        if phone:
+            path = path.with_suffix(".ulaw")
         if path.exists():
             return TtsResult(path.read_bytes(), voice, model, api_lang, 0, True, "cache")
 
         body = {"text": text, "model": model, "voice": voice, "language": api_lang, "speed": 1.0,
                 "audio_config": {"sample_rate": 24000, "num_channels": 1, "sample_width": 2,
                                  "encoding": "linear_pcm", "container": "wav"}}
+        if phone:
+            body["audio_config"] = {"sample_rate": 8000, "num_channels": 1, "sample_width": 2, "container": "mulaw"}
         t0 = time.perf_counter()
         resp = await self._send(lambda: {
             "method": "POST", "url": "/api/v1/tts/inference", "json": body,
             "headers": {"X-API-Key-ID": self.cfg.gnani_api_key, "X-API-Request-ID": request_id}})
         audio = resp.content
-        if audio[:4] != b"RIFF":
+        if phone:
+            if not audio:
+                raise GnaniError("server", "TTS returned no audio")
+        elif audio[:4] != b"RIFF":
             raise GnaniError("server", "TTS did not return WAV audio")
-        audio = fix_wav_header(audio)
+        else:
+            audio = fix_wav_header(audio)
         path.parent.mkdir(parents=True, exist_ok=True)
         path.write_bytes(audio)
         return TtsResult(audio, voice, model, api_lang, round((time.perf_counter() - t0) * 1000),

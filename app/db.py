@@ -107,7 +107,8 @@ CREATE TABLE IF NOT EXISTS calls (
     intent     TEXT,
     outcome    TEXT,
     escalated  INTEGER NOT NULL DEFAULT 0 CHECK (escalated IN (0, 1)),
-    summary    TEXT
+    summary    TEXT,
+    channel    TEXT NOT NULL DEFAULT 'BROWSER' CHECK (channel IN ('BROWSER', 'PHONE'))
 );
 
 CREATE TABLE IF NOT EXISTS turns (

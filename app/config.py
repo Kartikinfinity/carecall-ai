@@ -35,6 +35,9 @@ class Settings:
     gnani_stt_model: str = os.getenv("GNANI_STT_MODEL", "prisma-v3.0")
     gnani_stt_langs: str = os.getenv("GNANI_STT_LANGS", "hi-IN,en-IN")
     gnani_tts_model: str = os.getenv("GNANI_TTS_MODEL", "timbre-v2.5")
+    # Phone line: off unless PHONE_TOKEN is set. PHONE_LANG is a language code or "auto".
+    phone_token: str = os.getenv("PHONE_TOKEN", "")
+    phone_lang: str = os.getenv("PHONE_LANG", "auto")
     gnani_mock: bool = os.getenv("GNANI_MOCK", "0") == "1"
     gemini_api_key: str = os.getenv("GEMINI_API_KEY", "").strip()
     gemini_model: str = os.getenv("GEMINI_MODEL", "gemini-3.5-flash-lite")

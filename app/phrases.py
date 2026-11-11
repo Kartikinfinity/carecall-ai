@@ -1,6 +1,6 @@
 """Fixed sentences the app says without asking the LLM, in every supported language.
 
-REPLIES: safety and fallback replies, by kind then language.
+REPLIES: safety, fallback and phone-line replies, by kind then language.
 DONE:    what to say when a booking change already happened but the LLM failed afterwards.
 BUTTONS: what the browser sends on the caller's behalf when they press a button.
 
@@ -102,6 +102,19 @@ REPLIES = {
         "te-IN": "క్షమించండి, ప్రస్తుతం సాంకేతిక సమస్య ఉంది. మీకు కాల్ చేయమని సిబ్బందికి చెప్పాను.",
         "kn-IN": "ಕ್ಷಮಿಸಿ, ಈಗ ತಾಂತ್ರಿಕ ಸಮಸ್ಯೆ ಇದೆ. ನಿಮಗೆ ಕರೆ ಮಾಡಲು ಸಿಬ್ಬಂದಿಗೆ ತಿಳಿಸಿದ್ದೇನೆ.",
         "ml-IN": "ക്ഷമിക്കണം, ഇപ്പോൾ ഒരു സാങ്കേതിക പ്രശ്നമുണ്ട്. നിങ്ങളെ വിളിക്കാൻ ജീവനക്കാരോട് പറഞ്ഞിട്ടുണ്ട്.",
+    },
+    "HOLD": {
+        "en-IN": "One moment, please.",
+        "hi-IN": "जी, एक मिनट।",
+        "hi-en": "जी, एक second.",
+        "mr-IN": "एक मिनिट.",
+        "bn-IN": "এক মিনিট।",
+        "gu-IN": "એક મિનિટ.",
+        "pa-IN": "ਇੱਕ ਮਿੰਟ।",
+        "ta-IN": "ஒரு நிமிடம்.",
+        "te-IN": "ఒక్క నిమిషం.",
+        "kn-IN": "ಒಂದು ನಿಮಿಷ.",
+        "ml-IN": "ഒരു നിമിഷം.",
     },
     "GREETING": {
         "en-IN": "Hello, welcome to Mahanadi Aarogya Clinic. I am the clinic's AI receptionist. How can I help you?",
