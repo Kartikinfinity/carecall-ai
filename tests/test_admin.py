@@ -103,7 +103,7 @@ def test_faq_edit_reaches_the_assistant(client, live_conn):
     assert r.status_code == 200
     eng = DialogEngine(None)
     sess, _ = eng.start(live_conn, "PAT-1001")
-    assert new_en in eng._system_prompt(live_conn, sess)
+    assert new_en in eng._tool_clinic_info(live_conn, sess, None)["policies"]          # the assistant's source of policies
     assert client.put("/api/admin/faqs/NOPE", json={"answer_en": "hello world", "answer_hi": "नमस्ते दुनिया"}).status_code == 404
 
 

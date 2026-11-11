@@ -120,9 +120,9 @@ def _decl(name: str, description: str, props: dict | None = None, required: list
         schema["required"] = required
     return types.FunctionDeclaration(name=name, description=description, parameters_json_schema=schema)
 
-_DATE = {"type": "string", "description": "YYYY-MM-DD, resolved from the calendar in the instructions"}
+_DATE = {"type": "string", "description": "YYYY-MM-DD from the calendar"}
 _TIME = {"type": "string", "description": "HH:MM 24-hour, e.g. 17:15"}
-_DOCTOR = {"type": "string", "description": "Doctor name or specialty as the caller said it"}
+_DOCTOR = {"type": "string", "description": "Name or specialty, as said"}
 
 TOOLS = [
     _decl("find_slots", "Find the nearest open appointment slots (max 2) for a doctor or specialty.",
@@ -134,6 +134,8 @@ TOOLS = [
           {"doctor": _DOCTOR, "date": _DATE, "time": _TIME,
            "patient_name": {"type": "string", "description": "Required only for a new caller"}},
           ["doctor", "date", "time"]),
+    _decl("clinic_info", "Clinic address, payment modes, tests and services with fees and preparation, and policies "
+          "(reports, parking, cancelling, arrival time). Call before answering any such question."),
     _decl("my_appointments", "List the caller's upcoming appointments with their booking references."),
     _decl("propose_cancel", "Prepare cancelling one appointment. Does NOT cancel.",
           {"ref": {"type": "string", "description": "Booking reference like CC-1042"}}, ["ref"]),
@@ -289,6 +291,12 @@ class DialogEngine:
                         # The voice must match the script actually written, whatever the model declared.
                         final = (said, safety.guess_lang(said, fallback=declared))
                         result = {"status": "SPOKEN"}
+                        if _wrong_language(said, final[1], sess.lang) and not ctx.language_retry:
+                            # Some models slip into English. Ask once for the caller's own language.
+                            ctx.language_retry, final = True, None
+                            name = languages.get(sess.lang).name
+                            result = {"status": "NOT_SPOKEN", "message": f"The caller is speaking {name} ({sess.lang}). "
+                                      f"Call say again with the same content in {name}, not English."}
                 else:
                     ctx.tools.append(call.name)
                     result = self._run_tool(conn, sess, ctx, call.name, args)
@@ -476,6 +484,14 @@ class DialogEngine:
         conn.execute("UPDATE calls SET summary = ? WHERE id = ?", (summary, sess.call_id))
         return result
 
+    def _tool_clinic_info(self, conn, sess, ctx):
+        """Facts that most turns don't need, kept out of the prompt so each request stays small."""
+        clinic = conn.execute("SELECT * FROM clinic").fetchone()
+        return {"address": clinic["address_en"], "landmark": clinic["landmark"], "payment": clinic["payment_modes"],
+                "services": [f"{s['name_en']}: ₹{s['fee_inr']}; {s['hours_en']}; prep: {s['prep_en']}"
+                             for s in conn.execute("SELECT * FROM services")],
+                "policies": [f["answer_en"] for f in conn.execute("SELECT * FROM faqs WHERE active = 1")]}
+
     def _tool_clear_pending(self, conn, sess, ctx):
         sess.pending = None
         return {"status": "CLEARED"}
@@ -567,9 +583,6 @@ class DialogEngine:
             doctors.append(f"- {r['name']} ({r['name_hi']}): {r['specialty']}; fee ₹{r['fee_inr']}; "
                            f"hours {hours}; closed {', '.join(off)}"
                            + (f"; ON LEAVE {', '.join(leave)}" if leave else "") + status)
-        services = [f"- {s['name_en']}: ₹{s['fee_inr']}; {s['hours_en']}; prep: {s['prep_en']}"
-                    for s in conn.execute("SELECT * FROM services")]
-        faqs = [f"- [{f['category']}] {f['answer_en']}" for f in conn.execute("SELECT * FROM faqs WHERE active = 1")]
         if sess.patient_id:
             caller = f"Known caller: {sess.patient_name} ({sess.patient_id}). Do not ask for their name."
         elif sess.patient_name:
@@ -583,34 +596,21 @@ class DialogEngine:
         return f"""You are the AI receptionist of {clinic['name_en']}. You speak on a phone-style voice call.
 Your job is administrative only: clinic information, appointment booking, cancellation and rescheduling.
 
-NOW: {now.strftime('%Y-%m-%d %H:%M')} ({EN_DAYS[now.weekday()]}), India time.
-CALENDAR (use these exact dates):
-{chr(10).join(days)}
-
-CALLER: {caller}
-PENDING ACTION AWAITING THE CALLER'S YES: {pending}
-
-CLINIC FACTS (the only facts you may state):
-Address: {clinic['address_en']}; landmark: {clinic['landmark']}
+CLINIC FACTS (with tool results, the only facts you may state):
 Hours: {clinic['hours_en']}
-Payment: {clinic['payment_modes']}
 Doctors:
 {chr(10).join(doctors)}
-Services:
-{chr(10).join(services)}
-Policies:
-{chr(10).join(faqs)}
 
 RULES
 1. Every turn ends with exactly one `say` call. Keep it to 1-2 short sentences (under 200 characters). Never use lists or markdown.
-2. Never invent doctors, fees, timings, slots or policies. If something is not in CLINIC FACTS or a tool result, say you will ask staff to call back and use `escalate` with reason OTHER.
+2. Never invent doctors, fees, timings, slots or policies. For the address, payment, tests and their fees or preparation, reports, parking or any clinic policy, call `clinic_info` first and answer only from it. If something is not in CLINIC FACTS or a tool result, say you will ask staff to call back and use `escalate` with reason OTHER.
 3. Slot availability comes only from `find_slots`. Offer at most 2 slots at a time and let the caller choose; do not call propose_booking or propose_reschedule in the same turn as find_slots unless the caller already named an exact time that is in the results.
 3a. If find_slots returns DOCTOR_NOT_FOUND, tell the caller that doctor is not at this clinic and name the doctors and specialties that are available. Do not escalate for this.
 4. Booking: find_slots -> caller picks a slot -> (new caller: get their name) -> propose_booking -> read back doctor, day, date, time and fee and ask "shall I confirm?" -> only when the caller then says yes, call confirm_pending. Never say an appointment is booked, cancelled or moved unless confirm_pending returned that status in this turn.
 5. Cancel / reschedule: use my_appointments (known caller) or ask for the booking reference, then propose_cancel / propose_reschedule, read back, wait for yes, then confirm_pending. If the caller says no or changes their mind, call clear_pending.
 6. If a tool returns an error, explain briefly and offer the alternatives it returned.
 7. You are not a doctor. Never give medical advice, diagnoses, medicine or dose information, or interpret reports; use `escalate` with reason MEDICAL. A caller may mention a symptom while asking for an appointment: just help them book with a suitable doctor, without commenting on the symptom.
-8. Language: each caller message ends with a [caller language: ...] tag. Reply in THAT language and set `language` to it:
+8. Language: each caller message ends with a [caller language: ...] tag. Reply in THAT language and set `language` to it. Never answer in plain English unless the tag is en-IN, even if tool results are in English:
    - en-IN for English;
    - hi-IN for pure Hindi, written in Devanagari;
    - hi-en for Hinglish, written in MIXED script: Hindi words in Devanagari, English words in Latin letters, e.g. "जी हाँ, Doctor Chandrakar कल 10:30 बजे available हैं।"
@@ -618,15 +618,32 @@ RULES
    Transcripts of Hinglish speech arrive in Devanagari with some English words in Latin; treat those as hi-en.
 9. Write times as HH:MM in 24-hour form, dates as "12 November", money as ₹400, booking references as CC-1042. Do not spell numbers out (a later step converts them for speech).
 10. Use the caller's name at most once per call. Be warm, brief and clear; older callers may be on the line.
+
+THIS CALL, RIGHT NOW
+NOW: {now.strftime('%Y-%m-%d %H:%M')} ({EN_DAYS[now.weekday()]}), India time.
+CALENDAR (use these exact dates):
+{chr(10).join(days)}
+
+CALLER: {caller}
+PENDING ACTION AWAITING THE CALLER'S YES: {pending}
 """
 
 
 @dataclass
 class _TurnCtx:
     affirmative: bool
+    language_retry: bool = False
     card: dict | None = None
     escalated: bool = False
     tools: list[str] = field(default_factory=list)
+
+
+_LATIN_WORDS = re.compile(r"[A-Za-z]{2,}")
+
+
+def _wrong_language(text: str, reply_lang: str, caller_lang: str) -> bool:
+    """A full English sentence for a caller who is not speaking English."""
+    return reply_lang == "en-IN" and caller_lang != "en-IN" and len(_LATIN_WORDS.findall(text)) >= 5
 
 
 def _done_message(card: dict, lang: str) -> str:

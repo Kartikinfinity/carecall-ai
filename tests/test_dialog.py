@@ -248,3 +248,24 @@ def test_clean_reply(raw, clean):
 def test_unknown_patient_rejected(conn):
     with pytest.raises(booking.NotFound):
         engine().start(conn, "PAT-9999")
+
+
+# ------------------------------------------------------------------ reply language
+
+def test_an_english_reply_to_a_hinglish_caller_is_asked_for_again(conn):
+    eng = engine([say("Sure, the clinic opens at nine in the morning.", "en-IN")],
+                 [say("Ji, clinic subah 9 baje khulta hai.", "hi-en")])
+    sess, _ = eng.start(conn, "PAT-1020", "hi-en")
+    r = run(eng.turn(conn, sess.id, "Clinic kab khulta hai?"))
+    assert r.lang == "hi-en" and r.reply.startswith("Ji, clinic") and eng.llm.calls == 2
+
+
+def test_the_language_retry_happens_only_once_and_never_for_english_callers(conn):
+    eng = engine([say("Sure, the clinic opens at nine in the morning.", "en-IN")],
+                 [say("Yes, it opens at nine in the morning.", "en-IN")],
+                 [say("The clinic opens at nine in the morning.", "en-IN")])
+    sess, _ = eng.start(conn, "PAT-1020", "hi-en")
+    stubborn = run(eng.turn(conn, sess.id, "Clinic kab khulta hai?"))
+    assert stubborn.lang == "en-IN" and eng.llm.calls == 2          # asked once, then accepted
+    english = run(eng.turn(conn, sess.id, "What time does the clinic open on Saturday please?"))
+    assert english.lang == "en-IN" and eng.llm.calls == 3
